@@ -1,9 +1,10 @@
-package com.pesapata.agents.utils
+package com.example.androidlogin.utils
 
 import android.util.Log
-import com.crashlytics.android.Crashlytics
+//import com.crashlytics.android.Crashlytics
+import com.example.androidlogin.BuildConfig
 import com.facebook.FacebookAuthorizationException
-import com.pesapata.agents.BuildConfig
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import java.net.ConnectException
 import java.net.SocketException
 import java.net.SocketTimeoutException
@@ -100,7 +101,8 @@ class LogUtils {
                 return
             }
 
-            Crashlytics.logException(cause)
+//            Crashlytics.logException(cause)
+            FirebaseCrashlytics.getInstance().recordException(cause)
         }
     }
 }
