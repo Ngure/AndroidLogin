@@ -1,3 +1,23 @@
 <resources>
+    <!-- App Name -->
     <string name="app_name">Android Login</string>
+
+    <!-- Facebook ID -->
+    <string name="facebook_app_id">723486681441437</string>
+    <string name="fb_login_protocol_scheme">fb723486681441437</string>
+
+    <!-- Toolbar -->
+    <string name="toolbar_settings">Settings</string>
+
+    <!-- Login Activity -->
+    <string name="google_login">Google</string>
+    <string name="facebook_login">Facebook</string>
+    <string name="twitter_login">Twitter</string>
+    <string name="github_login">GitHub</string>
+    <string name="firebase_login">Firebase Login</string>
+    <string name="loading">Loading…</string>
+
+    <!-- Settings Activity -->
+    <string name="log_out">Log Out</string>
+
 </resources>
