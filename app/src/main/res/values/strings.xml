@@ -3,8 +3,8 @@
     <string name="app_name">Android Login</string>
 
     <!-- Facebook ID -->
-    <string name="facebook_app_id">723486681441437</string>
-    <string name="fb_login_protocol_scheme">fb723486681441437</string>
+    <string name="facebook_app_id">212238030651989</string>
+    <string name="fb_login_protocol_scheme">fb212238030651989</string>
 
     <!-- Toolbar -->
     <string name="toolbar_settings">Settings</string>
