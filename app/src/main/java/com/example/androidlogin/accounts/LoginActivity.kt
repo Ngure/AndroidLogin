@@ -1,11 +1,12 @@
 package com.example.androidlogin.accounts
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.View
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
-import com.bumptech.glide.Glide
 import com.example.androidlogin.R
 import com.example.androidlogin.home.HomeActivity
 import com.example.androidlogin.utils.LogUtils
@@ -18,12 +19,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.*
 import kotlinx.android.synthetic.main.activity_login.*
-import org.json.JSONException
-import kotlin.system.exitProcess
 
 class LoginActivity : AppCompatActivity() {
 
@@ -56,6 +53,15 @@ class LoginActivity : AppCompatActivity() {
         facebookLoginButton.setOnClickListener { facebookLogin() }
     }
 
+    public override fun onStart() {
+        super.onStart()
+        // Check if user is signed in (non-null) and update UI accordingly.
+        val currentUser = firebaseAuth.currentUser
+        if (currentUser != null) {
+            startActivity(Intent(this@LoginActivity, HomeActivity::class.java))
+        }
+    }
+
     private fun configureGoogleSignIn() {
         val googleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
@@ -72,51 +78,23 @@ class LoginActivity : AppCompatActivity() {
         loginManager.logInWithReadPermissions(this@LoginActivity, listOf("email", "public_profile"))
 
         loginManager.registerCallback(callbackManager, object : FacebookCallback<LoginResult> {
-            override fun onSuccess(loginResult: LoginResult?) {
-                progressBar.visibility = View.GONE
-                LogUtils.LOGD(TAG, "Facebook: Login is successful")
+            override fun onSuccess(loginResult: LoginResult) {
 
-                val request = GraphRequest.newMeRequest(
-                    loginResult?.accessToken
-                ) { json, response ->
-                    if (response.error != null) {
-//                        update_ui("error")
-                        LogUtils.LOGD(TAG, "Facebook: Response error")
-
-                    } else {
-                        val jsonResult = json.toString()
-                        println("JSON Result$jsonResult")
-
-                        try {
-                            Glide.with(baseContext)
-                                .load("https://graph.facebook.com/" + json.getString("id") + "/picture?type=normal")
-//                                .into(findViewById(R.id.imageView_fb_profile) as ImageView)
-                        } catch (e: JSONException) {
-                            e.printStackTrace()
-                        }
-
-//                        updateUI(jsonResult)
-                        LogUtils.LOGD(TAG, "Facebook: Json result")
-                    }
-                }
-                val parameters = Bundle()
-                parameters.putString("fields", "id, name, email")
-                request.parameters = parameters
-                request.executeAsync()
-
-                startActivity(Intent(this@LoginActivity, HomeActivity::class.java))
+                val credential = FacebookAuthProvider.getCredential(loginResult.accessToken.token)
+                finishWithAuthCredential(credential)
             }
 
             override fun onCancel() {
                 progressBar.visibility = View.GONE
                 LogUtils.LOGD(TAG, "Facebook: User cancelled")
-                Snackbar.make(login_activity_layout, "Facebook Login Cancelled.", Snackbar.LENGTH_SHORT).show()
+                setResult(Activity.RESULT_CANCELED)
+                finish()
             }
 
-            override fun onError(error: FacebookException?) {
+            override fun onError(error: FacebookException) {
                 progressBar.visibility = View.GONE
-                LogUtils.LOGE(TAG, "Facebook: Error", error!!)
-                Snackbar.make(login_activity_layout, "Facebook Login Error.", Snackbar.LENGTH_SHORT).show()
+                LogUtils.LOGE(TAG, "Facebook: Error", error)
+                finish()
             }
         })
     }
@@ -145,7 +123,11 @@ class LoginActivity : AppCompatActivity() {
             } catch (e: ApiException) {
                 // Google Sign In failed, update UI appropriately
                 LogUtils.LOGW(TAG, "Google sign in failed", e)
-                Snackbar.make(login_activity_layout, "Google sign in failed.", Snackbar.LENGTH_SHORT).show()
+                Snackbar.make(
+                    login_activity_layout,
+                    "Google sign in failed.",
+                    Snackbar.LENGTH_SHORT
+                ).show()
                 // Add SHA fingerprint if error persist ;-)
 
                 progressBar.visibility = View.GONE
@@ -169,32 +151,70 @@ class LoginActivity : AppCompatActivity() {
                 } else {
                     // If sign in fails, display a message to the user.
                     LogUtils.LOGW(TAG, "signInWithCredential:failure", task.exception!!)
-                    Snackbar.make(login_activity_layout, "Authentication Failed.", Snackbar.LENGTH_SHORT).show()
+                    Snackbar.make(
+                        login_activity_layout,
+                        "Authentication Failed.",
+                        Snackbar.LENGTH_SHORT
+                    ).show()
                     updateUI(null)
                 }
                 progressBar.visibility = View.GONE
             }
     }
 
-    private fun updateUI(user: FirebaseUser?) {
-        if (user != null) {
-            startActivity(Intent(this@LoginActivity, HomeActivity::class.java))
+    private fun finishWithAuthCredential(credential: AuthCredential) {
+        firebaseAuth.signInWithCredential(credential).addOnCompleteListener(this) { task ->
+            if (task.isSuccessful) {
+                LogUtils.LOGD(TAG, "signIn with credentials successful")
+                val user = task.result!!.user
+                if (user != null) {
+                    // check if the email address is valid, and if not we cannot proceed
+                    if (!isEmailAddressValid(user.email)) {
+                        setResult(AccountUtils.LOGIN_RESULT_CODE_INVALID_EMAIL)
+                        finish()
+                        return@addOnCompleteListener
+                    }
+
+                    val intent = Intent()
+                    setResult(AccountUtils.LOGIN_RESULT_CODE_OK, intent)
+                }
+
+                updateUI(user)
+                finish()
+            } else {
+                val exception = task.exception
+
+                if (exception is FirebaseAuthUserCollisionException) {
+                    setResult(AccountUtils.LOGIN_RESULT_CODE_ACCOUNT_ALREADY_EXISTS)
+                    return@addOnCompleteListener
+                }
+
+                setResult(AccountUtils.LOGIN_RESULT_CODE_PROFILES_FAILED)
+            }
         }
     }
 
-    public override fun onStart() {
-        super.onStart()
-        // Check if user is signed in (non-null) and update UI accordingly.
-        val currentUser = firebaseAuth.currentUser
-        if (currentUser != null) {
+    private fun isEmailAddressValid(emailAddress: String?): Boolean {
+        if (TextUtils.isEmpty(emailAddress))
+            return false
+        if (!emailAddress!!.contains("@") || !emailAddress.contains("."))
+            return false
+
+        val iat = emailAddress.indexOf("@")
+        val dat = emailAddress.lastIndexOf(".")
+        return dat > iat
+    }
+
+    private fun updateUI(user: FirebaseUser?) {
+        if (user != null) {
             startActivity(Intent(this@LoginActivity, HomeActivity::class.java))
+            finish()
         }
     }
 
     override fun onBackPressed() {
         super.onBackPressed()
         finish()
-        exitProcess(0)
     }
 
     companion object {
